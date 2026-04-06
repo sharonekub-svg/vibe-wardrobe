@@ -1,0 +1,20 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "gzFqdgxOLyJ7jxHsqmByH"
+uri = "file://artifacts/vibe/assets/images/icon.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "mXUoqvq4_ld8BvMk-OvRH"
+uri = "file://artifacts/vibe/assets/images/item1.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "TgZDznOWXJB1Vu1WIJlSz"
+uri = "file://artifacts/vibe/assets/images/item2.png"
+type = "image"
+title = "generated_image"
