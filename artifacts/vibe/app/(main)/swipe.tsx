@@ -1,13 +1,15 @@
 import { PaywallModal } from "@/components/PaywallModal";
 import { SwipeCard } from "@/components/SwipeCard";
 import { useApp } from "@/context/AppContext";
-import { FASHION_ITEMS } from "@/data/fashionItems";
+import { FashionItem } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
+import { useGetFashionItems } from "@workspace/api-client-react";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Platform,
@@ -18,7 +20,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const SCREEN_HEIGHT = Dimensions.get("window").height;
 const SESSION_DURATION = 30;
 const PAYWALL_TRIGGER = 20;
 const MAX_SWIPES = 30;
@@ -27,10 +28,31 @@ export default function SwipeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userProfile, addLikedItem, likedItems, isSubscribed, setIsSubscribed, resetSession } = useApp();
+  const {
+    userProfile,
+    addLikedItem,
+    likedItems,
+    isSubscribed,
+    setIsSubscribed,
+    resetSession,
+  } = useApp();
 
-  const budget = userProfile?.budget ?? 9999;
-  const filteredItems = FASHION_ITEMS.filter((i) => i.price <= budget);
+  const budget = userProfile?.budget;
+
+  const { data, isLoading, isError, refetch } = useGetFashionItems(
+    budget !== undefined ? { budget } : {},
+    { query: { staleTime: 5 * 60 * 1000 } }
+  );
+
+  const items: FashionItem[] = (data?.items ?? []).map((i) => ({
+    id: i.id,
+    name: i.name,
+    price: i.price,
+    formattedPrice: i.formattedPrice,
+    imageUrl: i.imageUrl,
+    category: i.category,
+    buyUrl: i.buyUrl,
+  }));
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeCount, setSwipeCount] = useState(0);
@@ -39,19 +61,24 @@ export default function SwipeScreen() {
   const [sessionEnded, setSessionEnded] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerAnimation = useRef(new Animated.Value(1)).current;
+  const timerStarted = useRef(false);
 
   useEffect(() => {
     resetSession();
-    startTimer();
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && items.length > 0 && !timerStarted.current) {
+      timerStarted.current = true;
+      startTimer();
+    }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, []);
+  }, [isLoading, items.length]);
 
   const triggerPaywall = useCallback(() => {
-    if (!isSubscribed) {
-      setPaywallVisible(true);
-    }
+    if (!isSubscribed) setPaywallVisible(true);
   }, [isSubscribed]);
 
   const startTimer = () => {
@@ -65,17 +92,12 @@ export default function SwipeScreen() {
         useNativeDriver: false,
       }).start();
 
-      if (remaining === PAYWALL_TRIGGER && !isSubscribed) {
-        triggerPaywall();
-      }
+      if (remaining === PAYWALL_TRIGGER) triggerPaywall();
       if (remaining <= 0) {
         if (timerRef.current) clearInterval(timerRef.current);
         setSessionEnded(true);
-        if (!isSubscribed) {
-          setPaywallVisible(true);
-        } else {
-          router.replace("/(main)/wardrobe");
-        }
+        if (!isSubscribed) setPaywallVisible(true);
+        else router.replace("/(main)/wardrobe");
       }
     }, 1000);
   };
@@ -94,7 +116,7 @@ export default function SwipeScreen() {
   }, []);
 
   const handleSwipeRight = useCallback(() => {
-    const item = filteredItems[currentIndex];
+    const item = items[currentIndex];
     if (item) addLikedItem(item);
     setCurrentIndex((i) => i + 1);
     setSwipeCount((c) => {
@@ -106,14 +128,12 @@ export default function SwipeScreen() {
       }
       return next;
     });
-  }, [currentIndex, filteredItems]);
+  }, [currentIndex, items]);
 
   const handleSubscribe = () => {
     setIsSubscribed(true);
     setPaywallVisible(false);
-    if (sessionEnded) {
-      router.replace("/(main)/wardrobe");
-    }
+    if (sessionEnded) router.replace("/(main)/wardrobe");
   };
 
   const timerColor = timerAnimation.interpolate({
@@ -126,14 +146,14 @@ export default function SwipeScreen() {
     outputRange: ["0%", "100%"],
   });
 
-  const displayItems = filteredItems.slice(currentIndex, currentIndex + 3).reverse();
-  const allDone = currentIndex >= filteredItems.length || swipeCount >= MAX_SWIPES;
+  const displayItems = items
+    .slice(currentIndex, currentIndex + 3)
+    .reverse();
+  const allDone =
+    currentIndex >= items.length || swipeCount >= MAX_SWIPES;
 
   const s = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
+    container: { flex: 1, backgroundColor: colors.background },
     header: {
       paddingTop: insets.top + (Platform.OS === "web" ? 67 : 12),
       paddingHorizontal: 24,
@@ -151,9 +171,7 @@ export default function SwipeScreen() {
       color: colors.foreground,
       letterSpacing: -0.5,
     },
-    appAccent: {
-      color: colors.primary,
-    },
+    appAccent: { color: colors.primary },
     wardrobeBtn: {
       flexDirection: "row",
       alignItems: "center",
@@ -189,10 +207,7 @@ export default function SwipeScreen() {
       borderRadius: 2,
       overflow: "hidden",
     },
-    timerFill: {
-      height: "100%",
-      borderRadius: 2,
-    },
+    timerFill: { height: "100%", borderRadius: 2 },
     timerCountdown: {
       fontSize: 14,
       fontFamily: "Inter_700Bold",
@@ -207,6 +222,21 @@ export default function SwipeScreen() {
       textAlign: "center",
       marginTop: 2,
     },
+    budgetTag: {
+      alignSelf: "center",
+      backgroundColor: "rgba(0,191,255,0.08)",
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderWidth: 1,
+      borderColor: "rgba(0,191,255,0.2)",
+      marginBottom: 8,
+    },
+    budgetTagText: {
+      fontSize: 11,
+      color: colors.primary,
+      fontFamily: "Inter_500Medium",
+    },
     deck: {
       flex: 1,
       marginHorizontal: 24,
@@ -218,7 +248,7 @@ export default function SwipeScreen() {
       width: "100%",
       height: "100%",
     },
-    emptyDeck: {
+    centered: {
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
@@ -272,20 +302,16 @@ export default function SwipeScreen() {
       textAlign: "center",
       marginBottom: 4,
     },
-    budgetTag: {
-      alignSelf: "center",
-      backgroundColor: "rgba(0,191,255,0.08)",
-      borderRadius: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderWidth: 1,
-      borderColor: "rgba(0,191,255,0.2)",
-      marginBottom: 8,
+    retryBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
     },
-    budgetTagText: {
-      fontSize: 11,
-      color: colors.primary,
-      fontFamily: "Inter_500Medium",
+    retryText: {
+      fontSize: 14,
+      fontFamily: "Inter_700Bold",
+      color: "#0a0a0a",
     },
   });
 
@@ -318,42 +344,55 @@ export default function SwipeScreen() {
               ]}
             />
           </View>
-          <Animated.Text
-            style={[s.timerCountdown, { color: timerColor }]}
-          >
+          <Animated.Text style={[s.timerCountdown, { color: timerColor }]}>
             {Math.max(0, timeLeft)}s
           </Animated.Text>
         </View>
 
         <Text style={s.swipeCounter}>
-          {swipeCount}/{MAX_SWIPES} swipes • {filteredItems.length} items in budget
+          {swipeCount}/{MAX_SWIPES} swipes •{" "}
+          {isLoading ? "loading..." : `${items.length} items in budget`}
         </Text>
       </View>
 
       <View style={s.budgetTag}>
-        <Text style={s.budgetTagText}>Budget: ${budget}</Text>
+        <Text style={s.budgetTagText}>
+          Budget: {budget !== undefined ? `$${budget}` : "Any"}
+        </Text>
       </View>
 
       <View style={s.deck}>
-        {allDone ? (
-          <View style={s.emptyDeck}>
+        {isLoading ? (
+          <View style={s.centered}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={s.emptySubtitle}>Loading your picks...</Text>
+          </View>
+        ) : isError ? (
+          <View style={s.centered}>
+            <Feather name="alert-circle" size={40} color="#ef4444" />
+            <Text style={s.emptyTitle}>Couldn't load items</Text>
+            <TouchableOpacity style={s.retryBtn} onPress={() => refetch()}>
+              <Text style={s.retryText}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : allDone ? (
+          <View style={s.centered}>
             <Feather name="check-circle" size={48} color={colors.primary} />
             <Text style={s.emptyTitle}>All done!</Text>
             <Text style={s.emptySubtitle}>
               Check your wardrobe to see your matches.
             </Text>
             <TouchableOpacity
-              style={[s.actionBtn, s.likeBtn, { width: 140, borderRadius: 12 }]}
+              style={[s.retryBtn, { marginTop: 8 }]}
               onPress={() => router.replace("/(main)/wardrobe")}
             >
-              <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
-                View Wardrobe
-              </Text>
+              <Text style={s.retryText}>View Wardrobe</Text>
             </TouchableOpacity>
           </View>
         ) : (
           displayItems.map((item, idx) => {
-            const absoluteIndex = currentIndex + (displayItems.length - 1 - idx);
+            const absoluteIndex =
+              currentIndex + (displayItems.length - 1 - idx);
             const isTop = absoluteIndex === currentIndex;
             return (
               <View key={item.id} style={[s.cardWrapper, { zIndex: idx }]}>
@@ -369,7 +408,7 @@ export default function SwipeScreen() {
         )}
       </View>
 
-      {!allDone && (
+      {!allDone && !isLoading && !isError && (
         <>
           <Text style={s.hintText}>Swipe right to save • left to skip</Text>
           <View style={s.actions}>

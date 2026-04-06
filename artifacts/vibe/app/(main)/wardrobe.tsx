@@ -1,6 +1,7 @@
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { Feather } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
@@ -24,10 +25,7 @@ export default function WardrobeScreen() {
   const budget = userProfile?.budget ?? 0;
 
   const s = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
+    container: { flex: 1, backgroundColor: colors.background },
     header: {
       paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16),
       paddingHorizontal: 24,
@@ -57,10 +55,7 @@ export default function WardrobeScreen() {
       color: colors.foreground,
       flex: 1,
     },
-    statsRow: {
-      flexDirection: "row",
-      gap: 12,
-    },
+    statsRow: { flexDirection: "row", gap: 12 },
     statCard: {
       flex: 1,
       backgroundColor: colors.card,
@@ -82,15 +77,25 @@ export default function WardrobeScreen() {
       fontFamily: "Inter_700Bold",
       color: colors.foreground,
     },
-    statAccent: {
-      color: colors.primary,
+    statAccent: { color: colors.primary },
+    budgetStatus: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 4,
     },
-    list: {
-      padding: 16,
+    overBudget: {
+      color: "#ef4444",
+      fontSize: 11,
+      fontFamily: "Inter_500Medium",
     },
-    row: {
-      justifyContent: "space-between",
+    underBudget: {
+      color: "#22c55e",
+      fontSize: 11,
+      fontFamily: "Inter_500Medium",
     },
+    list: { padding: 16 },
+    row: { justifyContent: "space-between" },
     itemCard: {
       width: "48%",
       marginBottom: 16,
@@ -100,21 +105,8 @@ export default function WardrobeScreen() {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    itemImage: {
-      width: "100%",
-      aspectRatio: 3 / 4,
-    },
-    itemInfo: {
-      padding: 10,
-    },
-    itemBrand: {
-      fontSize: 9,
-      letterSpacing: 1.5,
-      textTransform: "uppercase",
-      color: colors.primary,
-      fontFamily: "Inter_600SemiBold",
-      marginBottom: 2,
-    },
+    itemImage: { width: "100%", aspectRatio: 3 / 4 },
+    itemInfo: { padding: 10 },
     itemName: {
       fontSize: 13,
       fontFamily: "Inter_600SemiBold",
@@ -124,7 +116,22 @@ export default function WardrobeScreen() {
     itemPrice: {
       fontSize: 14,
       fontFamily: "Inter_700Bold",
-      color: colors.foreground,
+      color: colors.primary,
+      marginBottom: 8,
+    },
+    buyBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 5,
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      paddingVertical: 7,
+    },
+    buyText: {
+      fontSize: 12,
+      fontFamily: "Inter_700Bold",
+      color: "#0a0a0a",
     },
     emptyContainer: {
       flex: 1,
@@ -166,22 +173,6 @@ export default function WardrobeScreen() {
       fontFamily: "Inter_700Bold",
       color: "#0a0a0a",
     },
-    budgetStatus: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      marginTop: 4,
-    },
-    overBudget: {
-      color: "#ef4444",
-      fontSize: 11,
-      fontFamily: "Inter_500Medium",
-    },
-    underBudget: {
-      color: "#22c55e",
-      fontSize: 11,
-      fontFamily: "Inter_500Medium",
-    },
   });
 
   return (
@@ -207,7 +198,7 @@ export default function WardrobeScreen() {
           </View>
           <View style={s.statCard}>
             <Text style={s.statLabel}>Total Cost</Text>
-            <Text style={s.statValue}>${totalCost}</Text>
+            <Text style={s.statValue}>${totalCost.toFixed(2)}</Text>
             {budget > 0 && (
               <View style={s.budgetStatus}>
                 <Feather
@@ -216,13 +207,11 @@ export default function WardrobeScreen() {
                   color={totalCost > budget ? "#ef4444" : "#22c55e"}
                 />
                 <Text
-                  style={
-                    totalCost > budget ? s.overBudget : s.underBudget
-                  }
+                  style={totalCost > budget ? s.overBudget : s.underBudget}
                 >
                   {totalCost > budget
-                    ? `$${totalCost - budget} over budget`
-                    : `$${budget - totalCost} under budget`}
+                    ? `$${(totalCost - budget).toFixed(2)} over`
+                    : `$${(budget - totalCost).toFixed(2)} under budget`}
                 </Text>
               </View>
             )}
@@ -254,10 +243,13 @@ export default function WardrobeScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
             s.list,
-            { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 20) },
+            {
+              paddingBottom:
+                insets.bottom + (Platform.OS === "web" ? 34 : 20),
+            },
           ]}
           columnWrapperStyle={s.row}
-          scrollEnabled={likedItems.length > 0}
+          scrollEnabled={!!likedItems.length}
           renderItem={({ item }) => (
             <View style={s.itemCard}>
               <Image
@@ -266,11 +258,18 @@ export default function WardrobeScreen() {
                 resizeMode="cover"
               />
               <View style={s.itemInfo}>
-                <Text style={s.itemBrand}>{item.brand}</Text>
                 <Text style={s.itemName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                <Text style={s.itemPrice}>${item.price}</Text>
+                <Text style={s.itemPrice}>{item.formattedPrice}</Text>
+                <TouchableOpacity
+                  style={s.buyBtn}
+                  onPress={() => Linking.openURL(item.buyUrl)}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="shopping-bag" size={11} color="#0a0a0a" />
+                  <Text style={s.buyText}>Buy on H&M</Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}

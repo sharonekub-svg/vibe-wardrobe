@@ -2,6 +2,8 @@ import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
+import * as Linking from "expo-linking";
 import React from "react";
 import {
   Modal,
@@ -13,11 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-interface PaywallModalProps {
-  visible: boolean;
-  onDismiss: () => void;
-  onSubscribe: () => void;
-}
+const STRIPE_LINK = "https://buy.stripe.com/test_4gM5kD03N0poert7kwffy00";
 
 const FEATURES = [
   "Unlimited swipe sessions",
@@ -25,6 +23,12 @@ const FEATURES = [
   "Exclusive budget optimization tips",
   "Early access to new drops",
 ];
+
+interface PaywallModalProps {
+  visible: boolean;
+  onDismiss: () => void;
+  onSubscribe: () => void;
+}
 
 export function PaywallModal({
   visible,
@@ -34,8 +38,9 @@ export function PaywallModal({
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await Linking.openURL(STRIPE_LINK);
     onSubscribe();
   };
 
@@ -94,18 +99,9 @@ export function PaywallModal({
       marginBottom: 28,
       lineHeight: 20,
     },
-    highlight: {
-      color: colors.primary,
-    },
-    featureList: {
-      marginBottom: 28,
-      gap: 12,
-    },
-    featureRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-    },
+    highlight: { color: colors.primary },
+    featureList: { marginBottom: 28, gap: 12 },
+    featureRow: { flexDirection: "row", alignItems: "center", gap: 12 },
     checkCircle: {
       width: 24,
       height: 24,
@@ -165,10 +161,7 @@ export function PaywallModal({
       color: "#0a0a0a",
       letterSpacing: 0.5,
     },
-    dismissBtn: {
-      paddingVertical: 12,
-      alignItems: "center",
-    },
+    dismissBtn: { paddingVertical: 12, alignItems: "center" },
     dismissText: {
       fontSize: 13,
       color: colors.mutedForeground,
@@ -186,20 +179,16 @@ export function PaywallModal({
       <View style={s.overlay}>
         <View style={s.sheet}>
           <View style={s.glowBar} />
-
           <View style={s.lockIcon}>
             <Feather name="lock" size={24} color={colors.primary} />
           </View>
-
           <Text style={s.title}>
-            Subscribe to{" "}
-            <Text style={s.highlight}>Vibe Pro</Text>
+            Subscribe to <Text style={s.highlight}>Vibe Pro</Text>
           </Text>
           <Text style={s.subtitle}>
             Your timer is up. Unlock your full wardrobe and keep discovering
             premium styles.
           </Text>
-
           <View style={s.featureList}>
             {FEATURES.map((f) => (
               <View key={f} style={s.featureRow}>
@@ -210,14 +199,12 @@ export function PaywallModal({
               </View>
             ))}
           </View>
-
           <View style={s.priceBadge}>
             <Text style={s.priceLabel}>Vibe Pro</Text>
             <Text style={s.priceValue}>
-              $9.99<Text style={s.pricePeriod}>/mo</Text>
+              ₪29.90<Text style={s.pricePeriod}>/month</Text>
             </Text>
           </View>
-
           <TouchableOpacity
             style={s.cta}
             onPress={handleSubscribe}
@@ -225,7 +212,6 @@ export function PaywallModal({
           >
             <Text style={s.ctaText}>Subscribe Now</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             style={s.dismissBtn}
             onPress={onDismiss}

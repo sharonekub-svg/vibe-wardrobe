@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: fashion
+    description: Fashion item operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /fashion/items:
+    get:
+      operationId: getFashionItems
+      tags: [fashion]
+      summary: Get men's fashion items
+      description: Fetches men's fashion items from H&M, optionally filtered by budget
+      parameters:
+        - name: budget
+          in: query
+          required: false
+          schema:
+            type: number
+          description: Max price filter
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of fashion items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FashionItemsResponse"
+        "502":
+          description: Upstream API error
 components:
   schemas:
     HealthStatus:
@@ -33,4 +63,37 @@ components:
           type: string
       required:
         - status
-
+    FashionItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        formattedPrice:
+          type: string
+        imageUrl:
+          type: string
+        category:
+          type: string
+        buyUrl:
+          type: string
+      required:
+        - id
+        - name
+        - price
+        - formattedPrice
+        - imageUrl
+        - category
+        - buyUrl
+    FashionItemsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FashionItem"
+      required:
+        - items

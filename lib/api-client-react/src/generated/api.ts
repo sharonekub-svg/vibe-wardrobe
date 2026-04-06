@@ -13,7 +13,11 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  FashionItemsResponse,
+  GetFashionItemsParams,
+  HealthStatus,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
 import type { ErrorType } from "../custom-fetch";
@@ -92,6 +96,101 @@ export function useHealthCheck<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Fetches men's fashion items from H&M, optionally filtered by budget
+ * @summary Get men's fashion items
+ */
+export const getGetFashionItemsUrl = (params?: GetFashionItemsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/fashion/items?${stringifiedParams}`
+    : `/api/fashion/items`;
+};
+
+export const getFashionItems = async (
+  params?: GetFashionItemsParams,
+  options?: RequestInit,
+): Promise<FashionItemsResponse> => {
+  return customFetch<FashionItemsResponse>(getGetFashionItemsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetFashionItemsQueryKey = (params?: GetFashionItemsParams) => {
+  return [`/api/fashion/items`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetFashionItemsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFashionItems>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetFashionItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFashionItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetFashionItemsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFashionItems>>> = ({
+    signal,
+  }) => getFashionItems(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFashionItems>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetFashionItemsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFashionItems>>
+>;
+export type GetFashionItemsQueryError = ErrorType<void>;
+
+/**
+ * @summary Get men's fashion items
+ */
+
+export function useGetFashionItems<
+  TData = Awaited<ReturnType<typeof getFashionItems>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetFashionItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFashionItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetFashionItemsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

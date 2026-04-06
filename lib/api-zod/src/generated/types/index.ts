@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./fashionItem";
+export * from "./fashionItemsResponse";
+export * from "./getFashionItemsParams";
 export * from "./healthStatus";

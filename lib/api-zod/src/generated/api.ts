@@ -14,3 +14,28 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Fetches men's fashion items from H&M, optionally filtered by budget
+ * @summary Get men's fashion items
+ */
+export const getFashionItemsQueryPageDefault = 0;
+
+export const GetFashionItemsQueryParams = zod.object({
+  budget: zod.coerce.number().optional().describe("Max price filter"),
+  page: zod.coerce.number().default(getFashionItemsQueryPageDefault),
+});
+
+export const GetFashionItemsResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      id: zod.string(),
+      name: zod.string(),
+      price: zod.number(),
+      formattedPrice: zod.string(),
+      imageUrl: zod.string(),
+      category: zod.string(),
+      buyUrl: zod.string(),
+    }),
+  ),
+});

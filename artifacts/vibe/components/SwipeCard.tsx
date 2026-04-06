@@ -2,6 +2,7 @@ import { FashionItem } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
 import React, { useRef } from "react";
 import {
   Animated,
@@ -10,6 +11,7 @@ import {
   PanResponder,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 
@@ -135,49 +137,48 @@ export function SwipeCard({
       width: "100%",
       height: "72%",
     },
-    gradient: {
-      position: "absolute",
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: "50%",
-      justifyContent: "flex-end",
-      padding: 20,
-    },
     infoOverlay: {
       position: "absolute",
       bottom: 0,
       left: 0,
       right: 0,
-      padding: 20,
-      backgroundColor: "rgba(10,10,10,0.85)",
-    },
-    brand: {
-      fontSize: 11,
-      letterSpacing: 2,
-      textTransform: "uppercase",
-      color: colors.primary,
-      fontFamily: "Inter_600SemiBold",
-      marginBottom: 4,
-    },
-    name: {
-      fontSize: 22,
-      fontFamily: "Inter_700Bold",
-      color: "#ffffff",
-      marginBottom: 4,
+      padding: 16,
+      backgroundColor: "rgba(10,10,10,0.88)",
     },
     row: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    nameBlock: { flex: 1, marginRight: 8 },
+    name: {
+      fontSize: 20,
+      fontFamily: "Inter_700Bold",
+      color: "#ffffff",
+      marginBottom: 2,
     },
     price: {
-      fontSize: 18,
+      fontSize: 16,
       fontFamily: "Inter_600SemiBold",
-      color: "#ffffff",
+      color: colors.primary,
+    },
+    buyBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      backgroundColor: colors.primary,
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    buyText: {
+      fontSize: 12,
+      fontFamily: "Inter_700Bold",
+      color: "#0a0a0a",
     },
     category: {
-      fontSize: 12,
+      fontSize: 11,
       color: colors.mutedForeground,
       fontFamily: "Inter_400Regular",
     },
@@ -204,12 +205,8 @@ export function SwipeCard({
       fontFamily: "Inter_700Bold",
       letterSpacing: 1,
     },
-    likeText: {
-      color: "#00BFFF",
-    },
-    nopeText: {
-      color: "#ef4444",
-    },
+    likeText: { color: "#00BFFF" },
+    nopeText: { color: "#ef4444" },
   });
 
   return (
@@ -223,14 +220,23 @@ export function SwipeCard({
         resizeMode="cover"
       />
       <View style={s.infoOverlay}>
-        <Text style={s.brand}>{item.brand}</Text>
         <View style={s.row}>
-          <Text style={s.name}>{item.name}</Text>
+          <View style={s.nameBlock}>
+            <Text style={s.name} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <Text style={s.price}>{item.formattedPrice}</Text>
+          </View>
+          <TouchableOpacity
+            style={s.buyBtn}
+            onPress={() => Linking.openURL(item.buyUrl)}
+            activeOpacity={0.85}
+          >
+            <Feather name="shopping-bag" size={12} color="#0a0a0a" />
+            <Text style={s.buyText}>Buy</Text>
+          </TouchableOpacity>
         </View>
-        <View style={s.row}>
-          <Text style={s.price}>${item.price}</Text>
-          <Text style={s.category}>{item.category}</Text>
-        </View>
+        <Text style={s.category}>{item.category}</Text>
       </View>
 
       {isTop && (

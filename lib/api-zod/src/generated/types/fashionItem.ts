@@ -5,9 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
 
 export interface FashionItem {
   id: string;
@@ -18,15 +15,3 @@ export interface FashionItem {
   category: string;
   buyUrl: string;
 }
-
-export interface FashionItemsResponse {
-  items: FashionItem[];
-}
-
-export type GetFashionItemsParams = {
-  /**
-   * Max price filter
-   */
-  budget?: number;
-  page?: number;
-};

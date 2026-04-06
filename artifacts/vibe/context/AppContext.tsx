@@ -17,9 +17,10 @@ export interface FashionItem {
   id: string;
   name: string;
   price: number;
+  formattedPrice: string;
   imageUrl: string;
-  brand: string;
   category: string;
+  buyUrl: string;
 }
 
 interface AppContextType {
@@ -47,9 +48,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const profileJson = await AsyncStorage.getItem(PROFILE_KEY);
-        if (profileJson) {
-          setUserProfileState(JSON.parse(profileJson));
-        }
+        if (profileJson) setUserProfileState(JSON.parse(profileJson));
         const sub = await AsyncStorage.getItem(SUBSCRIBED_KEY);
         if (sub === "true") setIsSubscribedState(true);
       } catch (_e) {}
@@ -70,9 +69,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const clearLikedItems = useCallback(() => {
-    setLikedItems([]);
-  }, []);
+  const clearLikedItems = useCallback(() => setLikedItems([]), []);
 
   const setIsSubscribed = useCallback(async (val: boolean) => {
     setIsSubscribedState(val);
@@ -81,9 +78,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (_e) {}
   }, []);
 
-  const resetSession = useCallback(() => {
-    setLikedItems([]);
-  }, []);
+  const resetSession = useCallback(() => setLikedItems([]), []);
 
   return (
     <AppContext.Provider
