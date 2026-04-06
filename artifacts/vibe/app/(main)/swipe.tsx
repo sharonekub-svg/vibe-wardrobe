@@ -1,17 +1,15 @@
 import { PaywallModal } from "@/components/PaywallModal";
 import { SwipeCard } from "@/components/SwipeCard";
-import { useApp } from "@/context/AppContext";
-import { FashionItem } from "@/context/AppContext";
+import { FashionItem, useApp } from "@/context/AppContext";
+import { getCollectionLabel, mapApiItem } from "@/utils/fashion";
 import { useColors } from "@/hooks/useColors";
 import { useGetFashionItems } from "@workspace/api-client-react";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Dimensions,
   Platform,
   StyleSheet,
   Text,
@@ -20,9 +18,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const SESSION_DURATION = 30;
-const PAYWALL_TRIGGER = 20;
-const MAX_SWIPES = 30;
+const SHOP_TRIGGER = 30;
 
 export default function SwipeScreen() {
   const colors = useColors();
@@ -34,373 +30,158 @@ export default function SwipeScreen() {
     likedItems,
     isSubscribed,
     setIsSubscribed,
-    resetSession,
   } = useApp();
 
-  const budget = userProfile?.budget;
+  const age = userProfile?.age;
 
+  // Pass age so the server returns the right collection (Divided vs full women's)
   const { data, isLoading, isError, refetch } = useGetFashionItems(
-    budget !== undefined ? { budget } : {},
-    { query: { staleTime: 5 * 60 * 1000 } }
+    age !== undefined ? { age } : {},
+    { query: { staleTime: 0 } } // staleTime:0 → always re-fetch on mount (new session)
   );
 
-  const items: FashionItem[] = (data?.items ?? []).map((i) => ({
-    id: i.id,
-    name: i.name,
-    price: i.price,
-    formattedPrice: i.formattedPrice,
-    imageUrl: i.imageUrl,
-    category: i.category,
-    buyUrl: i.buyUrl,
-  }));
+  // Server shuffles on every request (staleTime:0 forces re-fetch per session)
+  const shuffledItems: FashionItem[] = useMemo(
+    () => (data?.items ?? []).map(mapApiItem),
+    [data]
+  );
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeCount, setSwipeCount] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(SESSION_DURATION);
   const [paywallVisible, setPaywallVisible] = useState(false);
-  const [sessionEnded, setSessionEnded] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timerAnimation = useRef(new Animated.Value(1)).current;
-  const timerStarted = useRef(false);
+  const shopTriggered = useRef(false);
 
+  // Reset index when a new shuffled deck arrives
   useEffect(() => {
-    resetSession();
-  }, []);
+    setCurrentIndex(0);
+    setSwipeCount(0);
+    shopTriggered.current = false;
+  }, [shuffledItems]);
 
-  useEffect(() => {
-    if (!isLoading && items.length > 0 && !timerStarted.current) {
-      timerStarted.current = true;
-      startTimer();
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isLoading, items.length]);
-
-  const triggerPaywall = useCallback(() => {
-    if (!isSubscribed) setPaywallVisible(true);
+  const advanceSwipe = useCallback(() => {
+    setCurrentIndex((i) => i + 1);
+    setSwipeCount((c) => {
+      const next = c + 1;
+      if (next >= SHOP_TRIGGER && !shopTriggered.current) {
+        shopTriggered.current = true;
+        if (!isSubscribed) setPaywallVisible(true);
+        else setTimeout(() => router.push("/(main)/shop"), 400);
+      }
+      return next;
+    });
   }, [isSubscribed]);
 
-  const startTimer = () => {
-    let remaining = SESSION_DURATION;
-    timerRef.current = setInterval(() => {
-      remaining -= 1;
-      setTimeLeft(remaining);
-      Animated.timing(timerAnimation, {
-        toValue: remaining / SESSION_DURATION,
-        duration: 900,
-        useNativeDriver: false,
-      }).start();
-
-      if (remaining === PAYWALL_TRIGGER) triggerPaywall();
-      if (remaining <= 0) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        setSessionEnded(true);
-        if (!isSubscribed) setPaywallVisible(true);
-        else router.replace("/(main)/wardrobe");
-      }
-    }, 1000);
-  };
-
   const handleSwipeLeft = useCallback(() => {
-    setCurrentIndex((i) => i + 1);
-    setSwipeCount((c) => {
-      const next = c + 1;
-      if (next >= MAX_SWIPES) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        setSessionEnded(true);
-        setTimeout(() => router.replace("/(main)/wardrobe"), 400);
-      }
-      return next;
-    });
-  }, []);
+    advanceSwipe();
+  }, [advanceSwipe]);
 
   const handleSwipeRight = useCallback(() => {
-    const item = items[currentIndex];
+    const item = shuffledItems[currentIndex];
     if (item) addLikedItem(item);
-    setCurrentIndex((i) => i + 1);
-    setSwipeCount((c) => {
-      const next = c + 1;
-      if (next >= MAX_SWIPES) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        setSessionEnded(true);
-        setTimeout(() => router.replace("/(main)/wardrobe"), 400);
-      }
-      return next;
-    });
-  }, [currentIndex, items]);
+    advanceSwipe();
+  }, [currentIndex, shuffledItems, advanceSwipe]);
 
   const handleSubscribe = () => {
     setIsSubscribed(true);
     setPaywallVisible(false);
-    if (sessionEnded) router.replace("/(main)/wardrobe");
+    router.push("/(main)/shop");
   };
 
-  const timerColor = timerAnimation.interpolate({
-    inputRange: [0, 0.33, 1],
-    outputRange: ["#ef4444", "#f59e0b", "#00BFFF"],
-  });
+  const displayItems = shuffledItems.slice(currentIndex, currentIndex + 3).reverse();
+  const allDone = currentIndex >= shuffledItems.length;
 
-  const timerWidth = timerAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0%", "100%"],
-  });
-
-  const displayItems = items
-    .slice(currentIndex, currentIndex + 3)
-    .reverse();
-  const allDone =
-    currentIndex >= items.length || swipeCount >= MAX_SWIPES;
-
-  const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    header: {
-      paddingTop: insets.top + (Platform.OS === "web" ? 67 : 12),
-      paddingHorizontal: 24,
-      paddingBottom: 12,
-    },
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 12,
-    },
-    appName: {
-      fontSize: 22,
-      fontFamily: "Inter_700Bold",
-      color: colors.foreground,
-      letterSpacing: -0.5,
-    },
-    appAccent: { color: colors.primary },
-    wardrobeBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      backgroundColor: colors.card,
-      borderRadius: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    wardrobeBtnText: {
-      fontSize: 12,
-      color: colors.foreground,
-      fontFamily: "Inter_500Medium",
-    },
-    timerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      marginBottom: 4,
-    },
-    timerLabel: {
-      fontSize: 12,
-      color: colors.mutedForeground,
-      fontFamily: "Inter_500Medium",
-      width: 48,
-    },
-    timerTrack: {
-      flex: 1,
-      height: 4,
-      backgroundColor: colors.border,
-      borderRadius: 2,
-      overflow: "hidden",
-    },
-    timerFill: { height: "100%", borderRadius: 2 },
-    timerCountdown: {
-      fontSize: 14,
-      fontFamily: "Inter_700Bold",
-      color: colors.foreground,
-      width: 28,
-      textAlign: "right",
-    },
-    swipeCounter: {
-      fontSize: 11,
-      color: colors.mutedForeground,
-      fontFamily: "Inter_400Regular",
-      textAlign: "center",
-      marginTop: 2,
-    },
-    budgetTag: {
-      alignSelf: "center",
-      backgroundColor: "rgba(0,191,255,0.08)",
-      borderRadius: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderWidth: 1,
-      borderColor: "rgba(0,191,255,0.2)",
-      marginBottom: 8,
-    },
-    budgetTagText: {
-      fontSize: 11,
-      color: colors.primary,
-      fontFamily: "Inter_500Medium",
-    },
-    deck: {
-      flex: 1,
-      marginHorizontal: 24,
-      marginVertical: 8,
-      position: "relative",
-    },
-    cardWrapper: {
-      position: "absolute",
-      width: "100%",
-      height: "100%",
-    },
-    centered: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 16,
-    },
-    emptyTitle: {
-      fontSize: 20,
-      fontFamily: "Inter_700Bold",
-      color: colors.foreground,
-    },
-    emptySubtitle: {
-      fontSize: 14,
-      color: colors.mutedForeground,
-      fontFamily: "Inter_400Regular",
-      textAlign: "center",
-    },
-    actions: {
-      flexDirection: "row",
-      justifyContent: "center",
-      gap: 24,
-      paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 20),
-      paddingTop: 12,
-    },
-    actionBtn: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      alignItems: "center",
-      justifyContent: "center",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 6,
-    },
-    skipBtn: {
-      backgroundColor: "#1e1e1e",
-      borderWidth: 1,
-      borderColor: "#ef4444",
-      shadowColor: "#ef4444",
-    },
-    likeBtn: {
-      backgroundColor: "#1e1e1e",
-      borderWidth: 1,
-      borderColor: "#00BFFF",
-      shadowColor: "#00BFFF",
-    },
-    hintText: {
-      fontSize: 11,
-      color: colors.mutedForeground,
-      fontFamily: "Inter_400Regular",
-      textAlign: "center",
-      marginBottom: 4,
-    },
-    retryBtn: {
-      backgroundColor: colors.primary,
-      borderRadius: 12,
-      paddingHorizontal: 24,
-      paddingVertical: 12,
-    },
-    retryText: {
-      fontSize: 14,
-      fontFamily: "Inter_700Bold",
-      color: "#0a0a0a",
-    },
-  });
+  const collectionLabel = getCollectionLabel(age);
 
   return (
-    <View style={s.container}>
-      <View style={s.header}>
+    <View style={[s.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <View style={[s.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 12) }]}>
         <View style={s.headerRow}>
-          <Text style={s.appName}>
-            Vi<Text style={s.appAccent}>be</Text>
+          <Text style={[s.appName, { color: colors.foreground }]}>
+            Vibe<Text style={{ color: colors.primary }}> Fit</Text>
           </Text>
           <TouchableOpacity
-            style={s.wardrobeBtn}
+            style={[s.wardrobeBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => router.push("/(main)/wardrobe")}
             activeOpacity={0.7}
           >
-            <Feather name="grid" size={14} color={colors.primary} />
-            <Text style={s.wardrobeBtnText}>{likedItems.length} saved</Text>
+            <Feather name="heart" size={14} color={colors.primary} />
+            <Text style={[s.wardrobeBtnText, { color: colors.foreground }]}>
+              {likedItems.length} liked
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={s.timerRow}>
-          <Text style={s.timerLabel}>
-            {timeLeft > 0 ? "Time" : "Done"}
-          </Text>
-          <View style={s.timerTrack}>
-            <Animated.View
+        {/* Swipe progress bar */}
+        <View style={s.progressRow}>
+          <View style={[s.progressTrack, { backgroundColor: colors.border }]}>
+            <View
               style={[
-                s.timerFill,
-                { width: timerWidth, backgroundColor: timerColor },
+                s.progressFill,
+                {
+                  width: `${Math.min((swipeCount / SHOP_TRIGGER) * 100, 100)}%`,
+                  backgroundColor: colors.primary,
+                },
               ]}
             />
           </View>
-          <Animated.Text style={[s.timerCountdown, { color: timerColor }]}>
-            {Math.max(0, timeLeft)}s
-          </Animated.Text>
+          <Text style={[s.progressLabel, { color: colors.mutedForeground }]}>
+            {swipeCount}/{SHOP_TRIGGER}
+          </Text>
         </View>
 
-        <Text style={s.swipeCounter}>
-          {swipeCount}/{MAX_SWIPES} swipes •{" "}
-          {isLoading ? "loading..." : `${items.length} items in budget`}
+        <Text style={[s.collectionBadge, { color: colors.primary }]}>
+          {collectionLabel}
+          {age !== undefined ? ` · ${age}yo` : ""}
         </Text>
       </View>
 
-      <View style={s.budgetTag}>
-        <Text style={s.budgetTagText}>
-          Budget: {budget !== undefined ? `$${budget}` : "Any"}
-        </Text>
-      </View>
-
+      {/* Card deck */}
       <View style={s.deck}>
         {isLoading ? (
           <View style={s.centered}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={s.emptySubtitle}>Loading your picks...</Text>
+            <Text style={[s.emptySubtitle, { color: colors.mutedForeground }]}>
+              Loading your picks…
+            </Text>
           </View>
         ) : isError ? (
           <View style={s.centered}>
-            <Feather name="alert-circle" size={40} color="#ef4444" />
-            <Text style={s.emptyTitle}>Couldn't load items</Text>
-            <TouchableOpacity style={s.retryBtn} onPress={() => refetch()}>
+            <Feather name="alert-circle" size={40} color="#e74c3c" />
+            <Text style={[s.emptyTitle, { color: colors.foreground }]}>Couldn't load items</Text>
+            <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={() => refetch()}>
               <Text style={s.retryText}>Try again</Text>
             </TouchableOpacity>
           </View>
         ) : allDone ? (
           <View style={s.centered}>
             <Feather name="check-circle" size={48} color={colors.primary} />
-            <Text style={s.emptyTitle}>All done!</Text>
-            <Text style={s.emptySubtitle}>
-              Check your wardrobe to see your matches.
+            <Text style={[s.emptyTitle, { color: colors.foreground }]}>All done!</Text>
+            <Text style={[s.emptySubtitle, { color: colors.mutedForeground }]}>
+              {likedItems.length > 0
+                ? `You liked ${likedItems.length} items. Check your matches!`
+                : "Swipe again to explore more styles."}
             </Text>
             <TouchableOpacity
-              style={[s.retryBtn, { marginTop: 8 }]}
+              style={[s.retryBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
               onPress={() => router.replace("/(main)/wardrobe")}
             >
-              <Text style={s.retryText}>View Wardrobe</Text>
+              <Text style={s.retryText}>My Matches</Text>
             </TouchableOpacity>
           </View>
         ) : (
           displayItems.map((item, idx) => {
-            const absoluteIndex =
-              currentIndex + (displayItems.length - 1 - idx);
+            const absoluteIndex = currentIndex + (displayItems.length - 1 - idx);
             const isTop = absoluteIndex === currentIndex;
             return (
               <View key={item.id} style={[s.cardWrapper, { zIndex: idx }]}>
                 <SwipeCard
                   item={item}
                   isTop={isTop}
+                  isSubscribed={isSubscribed}
                   onSwipeLeft={handleSwipeLeft}
                   onSwipeRight={handleSwipeRight}
+                  onBuyRequiresPaywall={() => setPaywallVisible(true)}
                 />
               </View>
             );
@@ -408,29 +189,26 @@ export default function SwipeScreen() {
         )}
       </View>
 
+      {/* Action buttons */}
       {!allDone && !isLoading && !isError && (
         <>
-          <Text style={s.hintText}>Swipe right to save • left to skip</Text>
-          <View style={s.actions}>
+          <Text style={[s.hintText, { color: colors.mutedForeground }]}>
+            Swipe right to like · left to skip
+          </Text>
+          <View style={[s.actions, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 20) }]}>
             <TouchableOpacity
-              style={[s.actionBtn, s.skipBtn]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                handleSwipeLeft();
-              }}
+              style={[s.actionBtn, s.nopeBtn]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleSwipeLeft(); }}
               activeOpacity={0.7}
             >
-              <Feather name="x" size={26} color="#ef4444" />
+              <Feather name="x" size={26} color="#95a5a6" />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[s.actionBtn, s.likeBtn]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                handleSwipeRight();
-              }}
+              style={[s.actionBtn, s.likeBtn, { borderColor: colors.primary, shadowColor: colors.primary }]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleSwipeRight(); }}
               activeOpacity={0.7}
             >
-              <Feather name="heart" size={24} color="#00BFFF" />
+              <Feather name="heart" size={24} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </>
@@ -444,3 +222,59 @@ export default function SwipeScreen() {
     </View>
   );
 }
+
+const s = StyleSheet.create({
+  container: { flex: 1 },
+  header: { paddingHorizontal: 24, paddingBottom: 10 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  appName: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
+  wardrobeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+  },
+  wardrobeBtnText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  progressRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 },
+  progressTrack: { flex: 1, height: 6, borderRadius: 3, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: 3 },
+  progressLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", width: 36, textAlign: "right" },
+  collectionBadge: { fontSize: 11, fontFamily: "Inter_500Medium", letterSpacing: 0.5 },
+  deck: {
+    flex: 1,
+    marginHorizontal: 20,
+    marginVertical: 8,
+    position: "relative",
+  },
+  cardWrapper: { position: "absolute", width: "100%", height: "100%" },
+  centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16 },
+  emptyTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  emptySubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 20 },
+  retryBtn: { borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
+  retryText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#ffffff" },
+  hintText: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center", marginBottom: 4 },
+  actions: { flexDirection: "row", justifyContent: "center", gap: 28, paddingTop: 12 },
+  actionBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+    backgroundColor: "#FFFFFF",
+  },
+  nopeBtn: { borderColor: "#bdc3c7", shadowColor: "#bdc3c7" },
+  likeBtn: {},
+});

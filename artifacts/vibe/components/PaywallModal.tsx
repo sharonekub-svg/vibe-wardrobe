@@ -1,8 +1,6 @@
-import { useApp } from "@/context/AppContext";
-import { useColors } from "@/hooks/useColors";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import React from "react";
 import {
@@ -15,13 +13,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const STRIPE_LINK = "https://buy.stripe.com/test_4gM5kD03N0poert7kwffy00";
+// Updated Stripe payment link as specified
+const STRIPE_LINK = "https://buy.stripe.com/test_cNi6oH03Nege3MP20cffy01";
 
 const FEATURES = [
+  "Unlock your Personalised Shop after 30 swipes",
+  "Direct H&M buy links on every card",
   "Unlimited swipe sessions",
-  "See your full wardrobe matches",
-  "Exclusive budget optimization tips",
-  "Early access to new drops",
+  "Early access to new Divided drops",
 ];
 
 interface PaywallModalProps {
@@ -30,12 +29,7 @@ interface PaywallModalProps {
   onSubscribe: () => void;
 }
 
-export function PaywallModal({
-  visible,
-  onDismiss,
-  onSubscribe,
-}: PaywallModalProps) {
-  const colors = useColors();
+export function PaywallModal({ visible, onDismiss, onSubscribe }: PaywallModalProps) {
   const insets = useSafeAreaInsets();
 
   const handleSubscribe = async () => {
@@ -43,131 +37,6 @@ export function PaywallModal({
     await Linking.openURL(STRIPE_LINK);
     onSubscribe();
   };
-
-  const s = StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: "rgba(0,0,0,0.85)",
-      justifyContent: "flex-end",
-    },
-    sheet: {
-      backgroundColor: "#141414",
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
-      paddingHorizontal: 28,
-      paddingTop: 28,
-      paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 20),
-      borderTopWidth: 1,
-      borderTopColor: "rgba(0,191,255,0.2)",
-    },
-    glowBar: {
-      width: 40,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: colors.primary,
-      alignSelf: "center",
-      marginBottom: 24,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.8,
-      shadowRadius: 8,
-    },
-    lockIcon: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: "rgba(0,191,255,0.12)",
-      alignItems: "center",
-      justifyContent: "center",
-      alignSelf: "center",
-      marginBottom: 16,
-      borderWidth: 1,
-      borderColor: "rgba(0,191,255,0.3)",
-    },
-    title: {
-      fontSize: 26,
-      fontFamily: "Inter_700Bold",
-      color: "#ffffff",
-      textAlign: "center",
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 14,
-      color: colors.mutedForeground,
-      fontFamily: "Inter_400Regular",
-      textAlign: "center",
-      marginBottom: 28,
-      lineHeight: 20,
-    },
-    highlight: { color: colors.primary },
-    featureList: { marginBottom: 28, gap: 12 },
-    featureRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-    checkCircle: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: "rgba(0,191,255,0.15)",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 1,
-      borderColor: "rgba(0,191,255,0.4)",
-    },
-    featureText: {
-      fontSize: 14,
-      color: "#e5e5e5",
-      fontFamily: "Inter_400Regular",
-    },
-    priceBadge: {
-      backgroundColor: "rgba(0,191,255,0.08)",
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: "rgba(0,191,255,0.2)",
-      paddingVertical: 16,
-      alignItems: "center",
-      marginBottom: 16,
-    },
-    priceLabel: {
-      fontSize: 12,
-      color: colors.mutedForeground,
-      fontFamily: "Inter_400Regular",
-      letterSpacing: 1.5,
-      textTransform: "uppercase",
-      marginBottom: 4,
-    },
-    priceValue: {
-      fontSize: 32,
-      fontFamily: "Inter_700Bold",
-      color: "#ffffff",
-    },
-    pricePeriod: {
-      fontSize: 14,
-      color: colors.mutedForeground,
-      fontFamily: "Inter_400Regular",
-    },
-    cta: {
-      backgroundColor: colors.primary,
-      borderRadius: 14,
-      paddingVertical: 18,
-      alignItems: "center",
-      marginBottom: 12,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.4,
-      shadowRadius: 12,
-    },
-    ctaText: {
-      fontSize: 16,
-      fontFamily: "Inter_700Bold",
-      color: "#0a0a0a",
-      letterSpacing: 0.5,
-    },
-    dismissBtn: { paddingVertical: 12, alignItems: "center" },
-    dismissText: {
-      fontSize: 13,
-      color: colors.mutedForeground,
-      fontFamily: "Inter_400Regular",
-    },
-  });
 
   return (
     <Modal
@@ -177,46 +46,54 @@ export function PaywallModal({
       onRequestClose={onDismiss}
     >
       <View style={s.overlay}>
-        <View style={s.sheet}>
-          <View style={s.glowBar} />
-          <View style={s.lockIcon}>
-            <Feather name="lock" size={24} color={colors.primary} />
+        {/* White/Green theme as spec requires */}
+        <View style={[s.sheet, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 20) }]}>
+          <View style={s.handle} />
+
+          <View style={s.iconWrap}>
+            <LinearGradient colors={["#2ecc71", "#27ae60"]} style={s.iconGradient}>
+              <Feather name="star" size={26} color="#ffffff" />
+            </LinearGradient>
           </View>
+
           <Text style={s.title}>
-            Subscribe to <Text style={s.highlight}>Vibe Pro</Text>
+            Unlock <Text style={s.accent}>Pro Vibe</Text>
           </Text>
           <Text style={s.subtitle}>
-            Your timer is up. Unlock your full wardrobe and keep discovering
-            premium styles.
+            You've hit 30 swipes! Unlock your personalised H&M shop and direct buy
+            links to keep shopping your style.
           </Text>
+
           <View style={s.featureList}>
             {FEATURES.map((f) => (
               <View key={f} style={s.featureRow}>
                 <View style={s.checkCircle}>
-                  <Feather name="check" size={12} color={colors.primary} />
+                  <Feather name="check" size={12} color="#2ecc71" />
                 </View>
                 <Text style={s.featureText}>{f}</Text>
               </View>
             ))}
           </View>
+
           <View style={s.priceBadge}>
-            <Text style={s.priceLabel}>Vibe Pro</Text>
+            <Text style={s.priceLabel}>Pro Vibe</Text>
             <Text style={s.priceValue}>
-              ₪29.90<Text style={s.pricePeriod}>/month</Text>
+              $4.99<Text style={s.pricePeriod}>/month</Text>
             </Text>
           </View>
-          <TouchableOpacity
-            style={s.cta}
-            onPress={handleSubscribe}
-            activeOpacity={0.85}
-          >
-            <Text style={s.ctaText}>Subscribe Now</Text>
+
+          <TouchableOpacity style={s.cta} onPress={handleSubscribe} activeOpacity={0.88}>
+            <LinearGradient
+              colors={["#2ecc71", "#27ae60"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={s.ctaGradient}
+            >
+              <Text style={s.ctaText}>Subscribe Now</Text>
+            </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={s.dismissBtn}
-            onPress={onDismiss}
-            activeOpacity={0.7}
-          >
+
+          <TouchableOpacity style={s.dismissBtn} onPress={onDismiss} activeOpacity={0.7}>
             <Text style={s.dismissText}>Maybe later</Text>
           </TouchableOpacity>
         </View>
@@ -224,3 +101,87 @@ export function PaywallModal({
     </Modal>
   );
 }
+
+const s = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(44,62,80,0.6)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 28,
+    paddingTop: 20,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#d5f5e3",
+    alignSelf: "center",
+    marginBottom: 24,
+  },
+  iconWrap: { alignSelf: "center", marginBottom: 16 },
+  iconGradient: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  title: {
+    fontSize: 26,
+    fontFamily: "Inter_700Bold",
+    color: "#2c3e50",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  accent: { color: "#2ecc71" },
+  subtitle: {
+    fontSize: 14,
+    color: "#7f8c8d",
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    marginBottom: 28,
+    lineHeight: 21,
+  },
+  featureList: { marginBottom: 24, gap: 12 },
+  featureRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  checkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#e8f8f0",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#d5f5e3",
+  },
+  featureText: { fontSize: 14, color: "#2c3e50", fontFamily: "Inter_400Regular", flex: 1 },
+  priceBadge: {
+    backgroundColor: "#f0faf4",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#d5f5e3",
+    paddingVertical: 16,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  priceLabel: {
+    fontSize: 11,
+    color: "#7f8c8d",
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  priceValue: { fontSize: 30, fontFamily: "Inter_700Bold", color: "#2c3e50" },
+  pricePeriod: { fontSize: 14, color: "#7f8c8d", fontFamily: "Inter_400Regular" },
+  cta: { borderRadius: 14, overflow: "hidden", marginBottom: 12 },
+  ctaGradient: { paddingVertical: 18, alignItems: "center" },
+  ctaText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#ffffff", letterSpacing: 0.5 },
+  dismissBtn: { paddingVertical: 12, alignItems: "center" },
+  dismissText: { fontSize: 13, color: "#bdc3c7", fontFamily: "Inter_400Regular" },
+});

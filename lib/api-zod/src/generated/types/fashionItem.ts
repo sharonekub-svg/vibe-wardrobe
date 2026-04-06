@@ -14,4 +14,6 @@ export interface FashionItem {
   imageUrl: string;
   category: string;
   buyUrl: string;
+  tags?: string[];
+  collection?: string;
 }

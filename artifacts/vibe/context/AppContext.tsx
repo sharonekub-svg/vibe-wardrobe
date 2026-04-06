@@ -10,7 +10,6 @@ import React, {
 export interface UserProfile {
   name: string;
   age: number;
-  budget: number;
 }
 
 export interface FashionItem {
@@ -21,6 +20,8 @@ export interface FashionItem {
   imageUrl: string;
   category: string;
   buyUrl: string;
+  tags?: string[];
+  collection?: string;
 }
 
 interface AppContextType {
@@ -29,8 +30,11 @@ interface AppContextType {
   likedItems: FashionItem[];
   addLikedItem: (item: FashionItem) => void;
   clearLikedItems: () => void;
+  /** Aggregated tags from all liked items — drives the personalized shop */
+  likedTags: string[];
   isSubscribed: boolean;
   setIsSubscribed: (val: boolean) => void;
+  /** Call on new login to clear the current session's swipe history */
   resetSession: () => void;
 }
 
@@ -51,7 +55,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (profileJson) setUserProfileState(JSON.parse(profileJson));
         const sub = await AsyncStorage.getItem(SUBSCRIBED_KEY);
         if (sub === "true") setIsSubscribedState(true);
-      } catch (_e) {}
+      } catch (e) { console.error("[AppContext] load", e); }
     })();
   }, []);
 
@@ -59,7 +63,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUserProfileState(profile);
     try {
       await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-    } catch (_e) {}
+    } catch (e) { console.error("[AppContext] setUserProfile", e); }
   }, []);
 
   const addLikedItem = useCallback((item: FashionItem) => {
@@ -75,10 +79,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsSubscribedState(val);
     try {
       await AsyncStorage.setItem(SUBSCRIBED_KEY, val ? "true" : "false");
-    } catch (_e) {}
+    } catch (e) { console.error("[AppContext] setIsSubscribed", e); }
   }, []);
 
   const resetSession = useCallback(() => setLikedItems([]), []);
+
+  const likedTags: string[] = React.useMemo(() => {
+    const freq: Record<string, number> = {};
+    for (const item of likedItems) {
+      for (const tag of item.tags ?? []) {
+        freq[tag] = (freq[tag] ?? 0) + 1;
+      }
+    }
+    return Object.keys(freq).sort((a, b) => (freq[b] ?? 0) - (freq[a] ?? 0));
+  }, [likedItems]);
 
   return (
     <AppContext.Provider
@@ -88,6 +102,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         likedItems,
         addLikedItem,
         clearLikedItems,
+        likedTags,
         isSubscribed,
         setIsSubscribed,
         resetSession,

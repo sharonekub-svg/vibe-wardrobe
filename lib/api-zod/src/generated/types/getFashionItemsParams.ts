@@ -7,9 +7,7 @@
  */
 
 export type GetFashionItemsParams = {
-  /**
-   * Max price filter
-   */
-  budget?: number;
+  /** User age — drives Divided vs full women's collection */
+  age?: number;
   page?: number;
 };

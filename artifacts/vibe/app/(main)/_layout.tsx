@@ -5,6 +5,7 @@ export default function MainLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="swipe" />
       <Stack.Screen name="wardrobe" />
+      <Stack.Screen name="shop" />
     </Stack>
   );
 }

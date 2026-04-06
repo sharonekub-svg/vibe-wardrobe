@@ -17,6 +17,8 @@ export interface FashionItem {
   imageUrl: string;
   category: string;
   buyUrl: string;
+  tags?: string[];
+  collection?: string;
 }
 
 export interface FashionItemsResponse {
@@ -24,9 +26,7 @@ export interface FashionItemsResponse {
 }
 
 export type GetFashionItemsParams = {
-  /**
-   * Max price filter
-   */
-  budget?: number;
+  /** User age — drives Divided vs full women's collection */
+  age?: number;
   page?: number;
 };
