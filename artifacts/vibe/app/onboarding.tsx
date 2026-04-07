@@ -1,5 +1,4 @@
 import { useApp } from "@/context/AppContext";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -101,14 +100,9 @@ export default function OnboardingScreen() {
         </View>
 
         <TouchableOpacity style={s.cta} onPress={handleStart} activeOpacity={0.88}>
-          <LinearGradient
-            colors={["#2ecc71", "#27ae60"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.ctaGradient}
-          >
+          <View style={s.ctaGradient}>
             <Text style={s.ctaText}>Get Started</Text>
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
 
         <Text style={s.hint}>Under 20? You'll get the exclusive H&M Divided collection</Text>
@@ -187,7 +181,7 @@ const s = StyleSheet.create({
   errorText: { fontSize: 12, color: "#e74c3c", fontFamily: "Inter_400Regular", marginBottom: 20 },
   fieldGroup: { marginBottom: 4 },
   cta: { marginTop: 36, borderRadius: 16, overflow: "hidden" },
-  ctaGradient: { paddingVertical: 18, alignItems: "center" },
+  ctaGradient: { paddingVertical: 18, alignItems: "center", backgroundColor: "#2ecc71", borderRadius: 16 },
   ctaText: { fontSize: 17, fontFamily: "Inter_700Bold", color: "#ffffff", letterSpacing: 0.5 },
   hint: { fontSize: 12, color: "#bdc3c7", fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 14 },
   divider: { height: 1, backgroundColor: "#d5f5e3", marginVertical: 32 },
