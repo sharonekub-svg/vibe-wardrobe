@@ -579,68 +579,66 @@ router.get("/fashion/items", async (req, res) => {
   const { age } = req.query;
   const ageNum = age ? parseInt(String(age)) : null;
 
-  // Attempt live H&M API first (always women's collection)
+  // Live ASOS API — women's fashion, age-filtered
   if (apiKey) {
     try {
-      const url = new URL(
-        "https://apidojo-hm-hennes-mauritz-v1.p.rapidapi.com/products/list"
-      );
-      url.searchParams.set("country", "us");
-      url.searchParams.set("lang", "en");
-      url.searchParams.set("currentpage", "0");
-      url.searchParams.set("pagesize", "40");
-      // Age < 20 → Divided teen collection; else full women's
-      const category = ageNum !== null && ageNum < 20 ? "ladies_divided_all" : "ladies_all";
-      url.searchParams.set("categories", category);
-      url.searchParams.set("sortBy", "ascPrice");
+      // categoryId 4209 = Women's, 2623 = Women's Teen/Young
+      const categoryId = ageNum !== null && ageNum < 20 ? "2623" : "4209";
+      const url = new URL("https://asos2.p.rapidapi.com/products/v2/list");
+      url.searchParams.set("store", "US");
+      url.searchParams.set("offset", "0");
+      url.searchParams.set("categoryId", categoryId);
+      url.searchParams.set("country", "US");
+      url.searchParams.set("sort", "freshness");
+      url.searchParams.set("limit", "48");
+      url.searchParams.set("lang", "en-US");
+      url.searchParams.set("currency", "USD");
+      url.searchParams.set("sizeSchema", "US");
 
       const response = await fetch(url.toString(), {
         headers: {
           "X-RapidAPI-Key": apiKey,
-          "X-RapidAPI-Host": "apidojo-hm-hennes-mauritz-v1.p.rapidapi.com",
+          "X-RapidAPI-Host": "asos2.p.rapidapi.com",
         },
       });
 
-      if (response.ok && response.status !== 204) {
-        const text = await response.text();
-        if (text) {
-          const data = JSON.parse(text) as {
-            results?: Array<{
-              code?: string;
-              name?: string;
-              price?: { value?: number; formattedValue?: string };
-              images?: Array<{ url?: string }>;
-              categoryName?: string;
-            }>;
-          };
+      if (response.ok) {
+        const data = JSON.parse(await response.text()) as {
+          products?: Array<{
+            id?: number;
+            name?: string;
+            price?: { current?: { value?: number; text?: string } };
+            imageUrl?: string;
+            url?: string;
+            brandName?: string;
+          }>;
+        };
 
-          const items = (data.results ?? [])
-            .filter((i) => i.code && i.name && i.images?.length)
-            // Strict: exclude any masculine cuts
-            .filter((i) => {
-              const n = (i.name ?? "").toLowerCase();
-              return !n.includes("men") && !n.includes("suit") && !n.includes("boxer");
-            })
-            .map((i) => ({
-              id: i.code!,
-              name: i.name!,
-              price: i.price?.value ?? 0,
-              formattedPrice: i.price?.formattedValue ?? `$${i.price?.value ?? 0}`,
-              imageUrl: i.images![0].url!,
-              category: i.categoryName ?? "Women's",
-              collection: ageNum !== null && ageNum < 20 ? "divided" : "ladies",
-              tags: [(i.categoryName ?? "fashion").toLowerCase()],
-              buyUrl: `https://www2.hm.com/en_us/productpage.${i.code}.html`,
-            }));
+        const items = (data.products ?? [])
+          .filter((i) => i.id && i.name && i.imageUrl)
+          .filter((i) => {
+            const n = (i.name ?? "").toLowerCase();
+            return !n.includes("men") && !n.includes("boy") && !n.includes("boxer");
+          })
+          .map((i) => ({
+            id: String(i.id),
+            name: i.name!,
+            price: i.price?.current?.value ?? 0,
+            formattedPrice: i.price?.current?.text ?? `$${i.price?.current?.value ?? 0}`,
+            imageUrl: `https://images.asos-media.com/products/${i.imageUrl}`,
+            category: "Women's",
+            collection: ageNum !== null && ageNum < 20 ? "divided" : "ladies",
+            tags: ["fashion", "women", "asos"],
+            buyUrl: `https://www.asos.com/us/${i.url}`,
+          }));
 
-          if (items.length > 0) {
-            res.json({ items: shuffle(items), source: "live" });
-            return;
-          }
+        if (items.length > 0) {
+          res.json({ items: shuffle(items), source: "live" });
+          return;
         }
       }
     } catch (err) {
-      req.log.warn({ err }, "Live H&M API unavailable, using curated items");
+      req.log.warn({ err }, "ASOS API unavailable, using curated items");
     }
   }
 
